@@ -40,16 +40,22 @@
                     <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-500/30">
                         FR
                     </div>
-                    <span class="font-bold text-2xl tracking-tight">FunRun <span class="gradient-text">2026</span></span>
+                    <span class="font-bold text-lg sm:text-2xl tracking-tight">FunRun <span class="gradient-text">2026</span></span>
                 </div>
-                <div class="hidden md:flex items-center space-x-8">
-                    <a href="{{ route('home') }}#about" class="text-gray-300 hover:text-white transition-colors font-medium">About</a>
-                    <a href="{{ route('home') }}#route" class="text-gray-300 hover:text-white transition-colors font-medium">Route</a>
-                    <a href="{{ route('home') }}#tickets" class="text-gray-300 hover:text-white transition-colors font-medium">Tickets</a>
-                    <a href="{{ route('home') }}#faq" class="text-gray-300 hover:text-white transition-colors font-medium">FAQ</a>
-                    <a href="{{ route('register') }}" class="bg-white text-slate-900 hover:bg-gray-100 px-6 py-2.5 rounded-full font-semibold transition-all transform hover:scale-105 shadow-[0_0_20px_rgba(255,255,255,0.3)]">
-                        Register Now
-                    </a>
+                
+                <!-- Search Panel -->
+                <div class="flex-1 max-w-[140px] sm:max-w-xs mx-2 sm:mx-8 relative">
+                    <input type="text" id="navbarSearch" placeholder="Cari event..." 
+                           class="w-full bg-slate-800/60 text-slate-200 placeholder-slate-400 text-xs sm:text-sm rounded-full pl-8 sm:pl-10 pr-3 py-1.5 sm:py-2 border border-white/10 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-transparent transition-all">
+                    <div class="absolute left-2.5 sm:left-3.5 top-[9px] sm:top-[11px] text-slate-500 leading-none">
+                        <svg class="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-4 sm:space-x-8">
+                    <a href="{{ route('home') }}" class="text-gray-300 hover:text-white transition-colors font-medium text-xs sm:text-base">Home</a>
+                    <a href="{{ route('home') }}#upcoming-events" class="text-gray-300 hover:text-white transition-colors font-medium text-xs sm:text-base">Event</a>
+                    <a href="https://wa.me/6289681201941" target="_blank" class="text-gray-300 hover:text-white transition-colors font-medium text-xs sm:text-base">Helpdesk</a>
                 </div>
             </div>
         </div>
@@ -89,6 +95,49 @@
                 nav.classList.add('shadow-lg', 'bg-slate-900/80');
             } else {
                 nav.classList.remove('shadow-lg', 'bg-slate-900/80');
+            }
+        });
+
+        // Dynamic Event Search & Filtering
+        document.addEventListener('DOMContentLoaded', () => {
+            const searchInput = document.getElementById('navbarSearch');
+            
+            if (searchInput) {
+                searchInput.addEventListener('input', function(e) {
+                    const query = e.target.value.toLowerCase().trim();
+                    const cards = document.querySelectorAll('.event-card');
+                    
+                    cards.forEach(card => {
+                        const title = card.getAttribute('data-nama') || '';
+                        if (title.includes(query)) {
+                            card.style.display = '';
+                        } else {
+                            card.style.display = 'none';
+                        }
+                    });
+                });
+
+                // If user is on a different page, pressing Enter redirects to homepage with search query
+                searchInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        if (window.location.pathname !== '/') {
+                            window.location.href = '/?q=' + encodeURIComponent(this.value);
+                        }
+                    }
+                });
+
+                // Read query param on homepage load
+                if (window.location.pathname === '/') {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const q = urlParams.get('q');
+                    if (q) {
+                        searchInput.value = q;
+                        // Trigger input event
+                        setTimeout(() => {
+                            searchInput.dispatchEvent(new Event('input'));
+                        }, 150);
+                    }
+                }
             }
         });
     </script>

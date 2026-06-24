@@ -1,0 +1,53 @@
+<div>
+    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Nama Event *</label>
+    <input type="text" name="nama" required placeholder="Nama event"
+           class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition">
+</div>
+<div>
+    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Thumbnail Event (JPG/PNG/WebP, maks 1MB)</label>
+    <input type="file" name="thumbnail" accept="image/jpeg,image/png,image/webp"
+           class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition">
+</div>
+<div>
+    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Lokasi *</label>
+    <input type="text" name="lokasi" required placeholder="Lokasi event"
+           class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition">
+</div>
+<div>
+    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Tanggal Event *</label>
+    <input type="text" name="tanggal" required placeholder="contoh: 25 Juli 2026"
+           class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition">
+</div>
+<div>
+    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Harga Tiket (Rp) *</label>
+    <input type="number" name="harga" min="0" value="0" placeholder="0 untuk gratis" required
+           class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition">
+</div>
+<div>
+    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Kategori *</label>
+    <select name="kategori" required
+            class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition bg-white">
+        <option value="upcoming">Upcoming Events</option>
+        <option value="highlight">Highlight Events</option>
+    </select>
+</div>
+<div>
+    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">URL Beli Tiket</label>
+    <input type="text" name="urlBeli" value="https://wa.me/6281393564042"
+           class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition">
+</div>
+<div>
+    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Waktu Event</label>
+    <input type="text" name="waktu" placeholder="contoh: 16.00 - 23.00 (kosongkan untuk default)"
+           class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition">
+</div>
+<div>
+    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Deskripsi Event</label>
+    <textarea name="deskripsi" placeholder="Deskripsi lengkap event (kosongkan untuk default)" rows="3"
+              class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"></textarea>
+</div>
+<div>
+    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Syarat & Ketentuan</label>
+    <textarea name="syarat_ketentuan" placeholder="Syarat & ketentuan event (kosongkan untuk default)" rows="3"
+              class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"></textarea>
+</div>

@@ -105,36 +105,43 @@ class AdminController extends Controller
         $participants = \App\Models\Participant::with(['user', 'ticket.payments'])->get();
         
         $filename = "participants_funrun_2026.csv";
-        $handle = fopen('php://output', 'w');
         
-        // Add headers
-        fputcsv($handle, ['ID', 'Full Name', 'Email', 'Phone', 'Category', 'Jersey Size', 'Ticket Code', 'Payment Status', 'Check-in Status']);
-
-        foreach ($participants as $p) {
-            $paymentStatus = 'Pending';
-            if ($p->ticket && $p->ticket->payments->count() > 0) {
-                $paymentStatus = $p->ticket->payments->first()->payment_status;
-            }
-
-            fputcsv($handle, [
-                $p->id,
-                $p->fullname,
-                $p->user->email ?? '-',
-                $p->phone,
-                $p->category,
-                $p->jersey_size,
-                $p->ticket->ticket_code ?? '-',
-                $paymentStatus,
-                $p->ticket->status ?? 'pending'
-            ]);
-        }
-
-        fclose($handle);
-
-        return response()->stream(function() use ($handle) {}, 200, [
-            'Content-Type' => 'text/csv',
+        $headers = [
+            'Content-Type' => 'text/csv; charset=utf-8',
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-        ]);
+        ];
+
+        $callback = function() use ($participants) {
+            $file = fopen('php://output', 'w');
+            
+            // Add UTF-8 BOM for Excel compatibility
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+            
+            // Write column headers
+            fputcsv($file, ['ID', 'Nama Lengkap', 'Email', 'No. WhatsApp', 'Kategori', 'Ukuran Jersey', 'Kode Tiket', 'Status Pembayaran', 'Status Check-in'], ';');
+
+            foreach ($participants as $p) {
+                $paymentStatus = 'Pending';
+                if ($p->ticket && $p->ticket->payments->count() > 0) {
+                    $paymentStatus = $p->ticket->payments->first()->payment_status;
+                }
+
+                fputcsv($file, [
+                    $p->id,
+                    $p->fullname,
+                    $p->user->email ?? '-',
+                    $p->phone,
+                    $p->category,
+                    $p->jersey_size,
+                    $p->ticket->ticket_code ?? '-',
+                    strtoupper($paymentStatus),
+                    strtoupper($p->ticket->status ?? 'pending')
+                ], ';');
+            }
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 
     public function payments(Request $request)
@@ -187,5 +194,118 @@ class AdminController extends Controller
         }
 
         return redirect()->back()->with('success', 'Payment approved! Ticket validated and WA notification queued.');
+    }
+
+    // ===== EVENT MANAGEMENT =====
+
+    public function events()
+    {
+        $events = \App\Http\Controllers\HomeController::loadEvents();
+        return view('admin.events', compact('events'));
+    }
+
+    public function storeEvent(Request $request)
+    {
+        $request->validate([
+            'nama'             => 'required|string|max:255',
+            'lokasi'           => 'required|string|max:255',
+            'tanggal'          => 'required|string|max:100',
+            'harga'            => 'required|integer|min:0',
+            'kategori'         => 'required|in:upcoming,highlight',
+            'urlBeli'          => 'nullable|string|max:500',
+            'thumbnail'        => 'nullable|image|mimes:jpeg,png,webp|max:1024',
+            'waktu'            => 'nullable|string|max:100',
+            'deskripsi'        => 'nullable|string|max:5000',
+            'syarat_ketentuan' => 'nullable|string|max:5000',
+        ]);
+
+        $events = \App\Http\Controllers\HomeController::loadEvents();
+        $maxId  = count($events) > 0 ? max(array_column($events, 'id')) : 0;
+
+        $thumbnailPath = '';
+        if ($request->hasFile('thumbnail')) {
+            $path = $request->file('thumbnail')->store('thumbnails', 'public');
+            $thumbnailPath = '/storage/' . $path;
+        }
+
+        $events[] = [
+            'id'               => $maxId + 1,
+            'nama'             => $request->nama,
+            'lokasi'           => $request->lokasi,
+            'tanggal'          => $request->tanggal,
+            'harga'            => (int) $request->harga,
+            'thumbnail'        => $thumbnailPath,
+            'kategori'         => $request->kategori,
+            'urlBeli'          => $request->urlBeli ?: 'https://wa.me/6281393564042',
+            'waktu'            => $request->waktu ?? '',
+            'deskripsi'        => $request->deskripsi ?? '',
+            'syarat_ketentuan' => $request->syarat_ketentuan ?? '',
+        ];
+
+        \App\Http\Controllers\HomeController::saveEvents($events);
+        return redirect()->route('admin.events')->with('success', 'Event berhasil ditambahkan!');
+    }
+
+    public function updateEvent(Request $request, $id)
+    {
+        $request->validate([
+            'nama'             => 'required|string|max:255',
+            'lokasi'           => 'required|string|max:255',
+            'tanggal'          => 'required|string|max:100',
+            'harga'            => 'required|integer|min:0',
+            'kategori'         => 'required|in:upcoming,highlight',
+            'urlBeli'          => 'nullable|string|max:500',
+            'thumbnail'        => 'nullable|image|mimes:jpeg,png,webp|max:1024',
+            'waktu'            => 'nullable|string|max:100',
+            'deskripsi'        => 'nullable|string|max:5000',
+            'syarat_ketentuan' => 'nullable|string|max:5000',
+        ]);
+
+        $events = \App\Http\Controllers\HomeController::loadEvents();
+        foreach ($events as &$ev) {
+            if ($ev['id'] == $id) {
+                $ev['nama']             = $request->nama;
+                $ev['lokasi']           = $request->lokasi;
+                $ev['tanggal']          = $request->tanggal;
+                $ev['harga']            = (int) $request->harga;
+                $ev['kategori']         = $request->kategori;
+                $ev['urlBeli']          = $request->urlBeli ?: 'https://wa.me/6281393564042';
+                $ev['waktu']            = $request->waktu ?? '';
+                $ev['deskripsi']        = $request->deskripsi ?? '';
+                $ev['syarat_ketentuan'] = $request->syarat_ketentuan ?? '';
+                
+                if ($request->hasFile('thumbnail')) {
+                    $path = $request->file('thumbnail')->store('thumbnails', 'public');
+                    $ev['thumbnail'] = '/storage/' . $path;
+                }
+                break;
+            }
+        }
+        unset($ev);
+
+        \App\Http\Controllers\HomeController::saveEvents($events);
+        return redirect()->route('admin.events')->with('success', 'Event berhasil diperbarui!');
+    }
+
+    public function destroyEvent($id)
+    {
+        $events = \App\Http\Controllers\HomeController::loadEvents();
+        $events = array_values(array_filter($events, fn($e) => $e['id'] != $id));
+        \App\Http\Controllers\HomeController::saveEvents($events);
+        return redirect()->route('admin.events')->with('success', 'Event berhasil dihapus!');
+    }
+
+    public function bulkDestroyEvent(Request $request)
+    {
+        $ids = $request->input('ids', []);
+        if (!is_array($ids) || empty($ids)) {
+            return redirect()->back()->with('error', 'Pilih event yang ingin dihapus terlebih dahulu.');
+        }
+
+        $events = \App\Http\Controllers\HomeController::loadEvents();
+        $events = array_values(array_filter($events, fn($e) => !in_array($e['id'], $ids)));
+        \App\Http\Controllers\HomeController::saveEvents($events);
+
+        return redirect()->route('admin.events')->with('success', 'Event terpilih berhasil dihapus!');
     }
 }

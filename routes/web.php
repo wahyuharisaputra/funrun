@@ -10,6 +10,7 @@ use App\Http\Controllers\AdminAuthController;
 
 // Landing Page
 Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::get('/event/{id}', [HomeController::class, 'showEvent'])->name('event.show');
 
 // Registration Flow
 Route::get('/register-event', [RegistrationController::class, 'showRegistrationForm'])->name('register');
@@ -41,5 +42,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('/payments/{id}/approve', [AdminController::class, 'approvePayment'])->name('payments.approve');
         Route::get('/scanner', [AdminController::class, 'scanner'])->name('scanner');
         Route::post('/scan', [AdminController::class, 'scanTicket'])->name('scan');
+        // Event Management
+        Route::get('/events', [AdminController::class, 'events'])->name('events');
+        Route::post('/events', [AdminController::class, 'storeEvent'])->name('events.store');
+        Route::post('/events/bulk-delete', [AdminController::class, 'bulkDestroyEvent'])->name('events.bulk-destroy');
+        Route::put('/events/{id}', [AdminController::class, 'updateEvent'])->name('events.update');
+        Route::delete('/events/{id}', [AdminController::class, 'destroyEvent'])->name('events.destroy');
     });
 });
