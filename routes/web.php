@@ -34,11 +34,13 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::middleware([\App\Http\Middleware\IsAdmin::class])->group(function () {
         Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
         Route::get('/participants', [AdminController::class, 'participants'])->name('participants');
+        Route::post('/participants/bulk-delete', [AdminController::class, 'bulkDestroyParticipant'])->name('participants.bulk-delete');
         Route::get('/participants/{id}/edit', [AdminController::class, 'editParticipant'])->name('participants.edit');
         Route::put('/participants/{id}', [AdminController::class, 'updateParticipant'])->name('participants.update');
         Route::delete('/participants/{id}', [AdminController::class, 'deleteParticipant'])->name('participants.delete');
         Route::get('/export-csv', [AdminController::class, 'exportCSV'])->name('export');
         Route::get('/payments', [AdminController::class, 'payments'])->name('payments');
+        Route::post('/payments/bulk-delete', [AdminController::class, 'bulkDestroyPayment'])->name('payments.bulk-delete');
         Route::post('/payments/{id}/approve', [AdminController::class, 'approvePayment'])->name('payments.approve');
         Route::get('/scanner', [AdminController::class, 'scanner'])->name('scanner');
         Route::post('/scan', [AdminController::class, 'scanTicket'])->name('scan');
@@ -50,3 +52,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::delete('/events/{id}', [AdminController::class, 'destroyEvent'])->name('events.destroy');
     });
 });
+
+// Fallback route for storage files (helps on shared hosting or when storage link is missing)
+Route::get('/storage/{path}', function ($path) {
+    $filePath = 'public/' . $path;
+    if (!\Illuminate\Support\Facades\Storage::exists($filePath)) {
+        abort(404);
+    }
+    return response()->file(\Illuminate\Support\Facades\Storage::path($filePath));
+})->where('path', '.*');
