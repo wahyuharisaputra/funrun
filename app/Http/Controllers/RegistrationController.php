@@ -16,7 +16,7 @@ class RegistrationController extends Controller
             // Fallback to first event or default
             $event = count($events) > 0 ? $events[0] : [
                 'id' => 1,
-                'nama' => 'FunRun 2026',
+                'nama' => 'SeTiket',
                 'lokasi' => 'City Square',
                 'tanggal' => '25-26 Juli 2026',
                 'harga' => 100000,
@@ -42,12 +42,20 @@ class RegistrationController extends Controller
             'dob'               => 'required|date',
             'gender'            => 'required|in:male,female',
             'address'           => 'required|string',
+            'nik'               => 'required|string|size:16|regex:/^[0-9]+$/',
+            'city'              => 'required|string|max:255',
+            'medical_history'   => 'nullable|string|max:1000',
             'jersey_size'       => 'required|in:S,M,L,XL,XXL',
             'emergency_contact' => 'required|string|max:255',
             'category'          => 'required|in:3K,5K,10K',
             'event_id'          => 'required|integer',
             'payment_method'    => 'required|in:bank_transfer,ewallet',
             'proof'             => 'required|image|mimes:jpeg,png,jpg,gif|max:2048'
+        ], [
+            'nik.required' => 'NIK wajib diisi.',
+            'nik.size'     => 'NIK harus terdiri dari 16 digit.',
+            'nik.regex'    => 'NIK hanya boleh berisi angka.',
+            'city.required' => 'Asal Kota/Kabupaten wajib diisi.',
         ]);
 
         // 1. Create or Find User
@@ -61,7 +69,7 @@ class RegistrationController extends Controller
         $events = \App\Http\Controllers\HomeController::loadEvents();
         $jsonEvent = collect($events)->firstWhere('id', (int)$eventId);
 
-        $title = $jsonEvent['nama'] ?? 'FunRun 2026';
+        $title = $jsonEvent['nama'] ?? 'SeTiket';
         
         // Parse a database-friendly date format
         $date = '2026-09-15';
@@ -80,6 +88,9 @@ class RegistrationController extends Controller
             'dob'               => $validated['dob'],
             'gender'            => $validated['gender'],
             'address'           => $validated['address'],
+            'nik'               => $validated['nik'],
+            'city'              => $validated['city'],
+            'medical_history'   => $validated['medical_history'] ?? null,
             'jersey_size'       => $validated['jersey_size'],
             'emergency_contact' => $validated['emergency_contact'],
             'category'          => $validated['category'],
@@ -98,7 +109,7 @@ class RegistrationController extends Controller
                                                 ->whereHas('ticket')
                                                 ->count();
         $newNumber = $categoryCount + 1;
-        $ticketCode = 'FR2026-' . $validated['category'] . '-' . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
+        $ticketCode = 'ST-' . $validated['category'] . '-' . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
 
         $ticket = \App\Models\Ticket::create([
             'participant_id' => $participant->id,
@@ -118,8 +129,13 @@ class RegistrationController extends Controller
             'proof_of_payment' => $path
         ]);
 
-        return redirect()->route('ticket.show', ['ticket_code' => $ticket->ticket_code])
+        return redirect()->route('registration.success')
             ->with('success', 'Pendaftaran berhasil! Bukti pembayaran telah diunggah. Silakan tunggu verifikasi admin.');
+    }
+
+    public function success()
+    {
+        return view('registration-success');
     }
 
     public function checkout($participant_id)
@@ -141,7 +157,7 @@ class RegistrationController extends Controller
                                                     ->whereHas('ticket')
                                                     ->count();
             $newNumber = $categoryCount + 1;
-            $ticketCode = 'FR2026-' . $participant->category . '-' . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
+            $ticketCode = 'ST-' . $participant->category . '-' . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
 
             $ticket = \App\Models\Ticket::create([
                 'participant_id' => $participant->id,

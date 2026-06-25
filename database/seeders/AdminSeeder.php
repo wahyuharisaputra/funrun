@@ -13,7 +13,7 @@ class AdminSeeder extends Seeder
     public function run(): void
     {
         \App\Models\User::firstOrCreate(
-            ['email' => 'admin@funrun.com'],
+            ['email' => 'admin@setiket.com'],
             [
                 'name' => 'Administrator',
                 'password' => bcrypt('admin123'),

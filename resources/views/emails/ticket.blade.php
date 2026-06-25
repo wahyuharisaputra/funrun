@@ -15,7 +15,7 @@
     <div class="container">
         <div class="header">
             <h2>🎉 Payment Verified! 🎉</h2>
-            <p>Your registration for <strong>{{ $ticket->participant->event->title ?? 'FunRun 2026' }}</strong> is officially confirmed.</p>
+            <p>Your registration for <strong>{{ $ticket->participant->event->title ?? 'SeTiket' }}</strong> is officially confirmed.</p>
         </div>
         
         <div class="details">
@@ -39,7 +39,7 @@
         </div>
 
         <div class="footer">
-            <p>&copy; 2026 FunRun Event Organizer. All rights reserved.</p>
+            <p>&copy; 2026 SeTiket. All rights reserved.</p>
         </div>
     </div>
 </body>

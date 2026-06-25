@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Login - FunRun 2026</title>
+    <title>Admin Login - SeTiket</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -19,7 +19,7 @@
     <div class="w-full max-w-md">
         <div class="text-center mb-8">
             <h1 class="text-3xl font-bold tracking-tight mb-2">Admin Access</h1>
-            <p class="text-slate-400">Sign in to manage FunRun 2026</p>
+            <p class="text-slate-400">Sign in to manage SeTiket</p>
         </div>
 
         <div class="glass-panel p-8 rounded-3xl shadow-2xl relative overflow-hidden">

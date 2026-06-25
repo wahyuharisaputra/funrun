@@ -106,12 +106,41 @@
                                 <button disabled class="bg-slate-100 text-slate-400 px-4 py-1.5 rounded-lg text-xs font-medium cursor-not-allowed w-full">
                                     Approved
                                 </button>
-                                <a href="{{ route('ticket.show', $payment->ticket->ticket_code) }}" target="_blank" class="bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors w-full flex items-center justify-center gap-1">
-                                    View E-Ticket
+                                <a href="{{ route('admin.eticket.pdf', $payment->ticket->ticket_code) }}" target="_blank" class="bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors w-full flex items-center justify-center gap-1">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                    Download E-Ticket PDF
                                 </a>
                                 @php
                                     $waNumber = $payment->ticket && $payment->ticket->participant ? preg_replace('/^0/', '62', $payment->ticket->participant->phone) : '';
-                                    $waText = $payment->ticket && $payment->ticket->participant ? urlencode("🎉 *PEMBAYARAN BERHASIL* 🎉\n\nHalo *{$payment->ticket->participant->fullname}*,\n\nPembayaran tiket FunRun 2026 Anda telah diverifikasi!\n\nLink E-Ticket & QR Code:\n" . route('ticket.show', $payment->ticket->ticket_code) . "\n\nTerima kasih!") : '';
+                                    
+                                    $rawWaText = "";
+                                    if ($payment->ticket && $payment->ticket->participant) {
+                                        $p = $payment->ticket->participant;
+                                        $t = $payment->ticket;
+                                        
+                                        $categoryTitles = [
+                                            '3K' => '3K Fun Walk',
+                                            '5K' => '5K Night Run',
+                                            '10K' => '10K Challenger'
+                                        ];
+                                        $ticketTitle = $categoryTitles[$p->category] ?? $p->category;
+
+                                        $rawWaText = "*PEMBAYARAN BERHASIL*\n" .
+                                                     "*SeTiket*\n\n" .
+                                                     "Halo *{$p->fullname}*,\n\n" .
+                                                     "Pembayaran pendaftaran Anda untuk event *SeTiket* telah berhasil diverifikasi!\n\n" .
+                                                     "*Detail Peserta:*\n" .
+                                                     "• Nama Lengkap: *{$p->fullname}*\n" .
+                                                     "• No. WhatsApp: *{$p->phone}*\n" .
+                                                     "• Kode Tiket: *{$t->ticket_code}*\n" .
+                                                     "• Kategori: *{$ticketTitle}*\n" .
+                                                     "• Ukuran Jersey: *{$p->jersey_size}*\n\n" .
+                                                     "*Download PDF Resmi E-Ticket:*\n" . route('ticket.pdf', $t->ticket_code) . "\n\n" .
+                                                     "*Catatan:*\n" .
+                                                     "Silakan simpan link di atas atau unduh PDF tiket Anda. Tunjukkan QR Code pada tiket saat melakukan check-in di lokasi acara untuk pengambilan Race Pack & BIB.\n\n" .
+                                                     "Terima kasih atas partisipasi Anda, sampai jumpa di garis start!";
+                                    }
+                                    $waText = urlencode($rawWaText);
                                 @endphp
                                 @if($waNumber)
                                 <a href="https://wa.me/{{ $waNumber }}?text={{ $waText }}" target="_blank" class="bg-green-500 hover:bg-green-600 text-white px-4 py-1.5 rounded-lg text-xs font-medium transition-colors w-full flex items-center justify-center gap-1">

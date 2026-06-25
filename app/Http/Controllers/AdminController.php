@@ -3,15 +3,96 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class AdminController extends Controller
 {
+    public function __construct()
+    {
+        // Only run sync if database table events exists, to avoid issues during migration
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('events')) {
+                self::syncEventsToDatabase();
+            }
+        } catch (\Throwable $e) {
+            // ignore
+        }
+    }
+
+    private function checkSuperAdmin()
+    {
+        if (auth()->user()->role !== 'super_admin') {
+            abort(403, 'Hanya Super Admin yang dapat mengakses halaman ini.');
+        }
+    }
+
+    public static function parseDateString($dateStr)
+    {
+        $dateStr = trim($dateStr);
+        $dbDate = '2026-09-15'; // Default fallback
+        try {
+            $months = [
+                'Januari' => '01', 'Februari' => '02', 'Maret' => '03', 'April' => '04',
+                'Mei' => '05', 'Juni' => '06', 'Juli' => '07', 'Agustus' => '08',
+                'September' => '09', 'Oktober' => '10', 'November' => '11', 'Desember' => '12',
+                'Jan' => '01', 'Feb' => '02', 'Mar' => '03', 'Apr' => '04',
+                'Jun' => '06', 'Jul' => '07', 'Aug' => '08', 'Sep' => '09', 'Oct' => '10', 'Nov' => '11', 'Dec' => '12'
+            ];
+            // If date is range e.g. "25-26 Juli 2026", extract "26 Juli 2026"
+            $cleaned = preg_replace('/^\d+\s*-\s*(\d+)/', '$1', $dateStr);
+            foreach ($months as $ind => $num) {
+                if (stripos($cleaned, $ind) !== false) {
+                    $cleaned = str_ireplace($ind, $num, $cleaned);
+                    break;
+                }
+            }
+            $timestamp = strtotime($cleaned);
+            if ($timestamp) {
+                $dbDate = date('Y-m-d', $timestamp);
+            }
+        } catch (\Throwable $e) {
+            // fallback
+        }
+        return $dbDate;
+    }
+
+    public static function syncEventsToDatabase()
+    {
+        $events = \App\Http\Controllers\HomeController::loadEvents();
+        foreach ($events as $ev) {
+            \App\Models\Event::updateOrCreate(
+                ['id' => $ev['id']],
+                [
+                    'title' => $ev['nama'] ?? 'SeTiket',
+                    'date' => self::parseDateString($ev['tanggal']),
+                    'location' => $ev['lokasi'] ?? 'City Square',
+                    'quota' => 5000
+                ]
+            );
+        }
+    }
+
     public function dashboard()
     {
-        $totalParticipants = \App\Models\Participant::count();
-        $totalRevenue = \App\Models\Payment::where('payment_status', 'paid')->sum('amount');
-        $ticketsSold = \App\Models\Ticket::where('status', 'valid')->count();
-        $checkedIn = \App\Models\Ticket::where('status', 'checked-in')->count();
+        $user = auth()->user();
+        if ($user->role === 'admin') {
+            $eventId = $user->event_id;
+            $totalParticipants = \App\Models\Participant::where('event_id', $eventId)->count();
+            $totalRevenue = \App\Models\Payment::whereHas('ticket.participant', function($q) use ($eventId) {
+                $q->where('event_id', $eventId);
+            })->where('payment_status', 'paid')->sum('amount');
+            $ticketsSold = \App\Models\Ticket::whereHas('participant', function($q) use ($eventId) {
+                $q->where('event_id', $eventId);
+            })->where('status', 'valid')->count();
+            $checkedIn = \App\Models\Ticket::whereHas('participant', function($q) use ($eventId) {
+                $q->where('event_id', $eventId);
+            })->where('status', 'checked-in')->count();
+        } else {
+            $totalParticipants = \App\Models\Participant::count();
+            $totalRevenue = \App\Models\Payment::where('payment_status', 'paid')->sum('amount');
+            $ticketsSold = \App\Models\Ticket::where('status', 'valid')->count();
+            $checkedIn = \App\Models\Ticket::where('status', 'checked-in')->count();
+        }
 
         return view('admin.dashboard', compact('totalParticipants', 'totalRevenue', 'ticketsSold', 'checkedIn'));
     }
@@ -19,6 +100,11 @@ class AdminController extends Controller
     public function participants(Request $request)
     {
         $query = \App\Models\Participant::with(['ticket.payments', 'user'])->latest();
+        $user = auth()->user();
+
+        if ($user->role === 'admin') {
+            $query->where('event_id', $user->event_id);
+        }
 
         $currentCategory = $request->category ?? 'all';
         if ($currentCategory !== 'all') {
@@ -47,12 +133,21 @@ class AdminController extends Controller
     public function editParticipant($id)
     {
         $participant = \App\Models\Participant::findOrFail($id);
+        $user = auth()->user();
+        if ($user->role === 'admin' && $participant->event_id !== $user->event_id) {
+            abort(403, 'Unauthorized action.');
+        }
         return view('admin.participant-edit', compact('participant'));
     }
 
     public function updateParticipant(Request $request, $id)
     {
         $participant = \App\Models\Participant::findOrFail($id);
+        $user = auth()->user();
+        if ($user->role === 'admin' && $participant->event_id !== $user->event_id) {
+            abort(403, 'Unauthorized action.');
+        }
+
         $request->validate([
             'fullname' => 'required|string|max:255',
             'phone' => 'required|string|max:20',
@@ -68,6 +163,10 @@ class AdminController extends Controller
     public function deleteParticipant($id)
     {
         $participant = \App\Models\Participant::findOrFail($id);
+        $user = auth()->user();
+        if ($user->role === 'admin' && $participant->event_id !== $user->event_id) {
+            abort(403, 'Unauthorized action.');
+        }
         
         // Manual cascade delete
         if ($participant->ticket) {
@@ -86,9 +185,13 @@ class AdminController extends Controller
             return redirect()->back()->with('error', 'Select participants to delete first.');
         }
 
+        $user = auth()->user();
         foreach ($ids as $id) {
             $participant = \App\Models\Participant::find($id);
             if ($participant) {
+                if ($user->role === 'admin' && $participant->event_id !== $user->event_id) {
+                    continue; // Skip unauthorized deletion
+                }
                 if ($participant->ticket) {
                     $participant->ticket->payments()->delete();
                     $participant->ticket()->delete();
@@ -118,6 +221,11 @@ class AdminController extends Controller
             return response()->json(['success' => false, 'message' => 'Ticket not found!']);
         }
 
+        $user = auth()->user();
+        if ($user->role === 'admin' && $ticket->participant->event_id !== $user->event_id) {
+            return response()->json(['success' => false, 'message' => 'Tiket ini terdaftar pada event lain!']);
+        }
+
         if ($ticket->status === 'checked-in') {
             return response()->json(['success' => false, 'message' => 'Ticket already checked in!']);
         }
@@ -138,6 +246,11 @@ class AdminController extends Controller
     public function exportCSV(Request $request)
     {
         $query = \App\Models\Participant::with(['user', 'ticket.payments'])->latest();
+        $user = auth()->user();
+
+        if ($user->role === 'admin') {
+            $query->where('event_id', $user->event_id);
+        }
 
         if ($request->has('category') && $request->category !== 'all') {
             $query->where('category', $request->category);
@@ -159,7 +272,7 @@ class AdminController extends Controller
 
         $participants = $query->get();
         
-        $filename = "participants_funrun_2026.csv";
+        $filename = "participants_setiket.csv";
         
         $headers = [
             'Content-Type' => 'text/csv; charset=utf-8',
@@ -173,7 +286,7 @@ class AdminController extends Controller
             fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
             
             // Write column headers
-            fputcsv($file, ['ID', 'Nama Lengkap', 'Email', 'No. WhatsApp', 'Kategori', 'Ukuran Jersey', 'Kode Tiket', 'Status Pembayaran', 'Status Check-in'], ';');
+            fputcsv($file, ['ID', 'Nama Lengkap', 'NIK', 'Asal Kota', 'Email', 'No. WhatsApp', 'Kategori', 'Ukuran Jersey', 'Riwayat Penyakit', 'Kode Tiket', 'Status Pembayaran', 'Status Check-in'], ';');
 
             foreach ($participants as $p) {
                 $paymentStatus = 'Pending';
@@ -184,10 +297,13 @@ class AdminController extends Controller
                 fputcsv($file, [
                     $p->id,
                     $p->fullname,
+                    $p->nik ?? '-',
+                    $p->city ?? '-',
                     $p->user->email ?? '-',
                     $p->phone,
                     $p->category,
                     $p->jersey_size,
+                    $p->medical_history ?? '-',
                     $p->ticket->ticket_code ?? '-',
                     strtoupper($paymentStatus),
                     strtoupper($p->ticket->status ?? 'pending')
@@ -202,6 +318,14 @@ class AdminController extends Controller
     public function payments(Request $request)
     {
         $query = \App\Models\Payment::with(['ticket.participant'])->latest();
+        $user = auth()->user();
+
+        if ($user->role === 'admin') {
+            $eventId = $user->event_id;
+            $query->whereHas('ticket.participant', function($q) use ($eventId) {
+                $q->where('event_id', $eventId);
+            });
+        }
 
         $currentStatus = $request->status ?? 'all';
         if ($currentStatus !== 'all') {
@@ -236,9 +360,13 @@ class AdminController extends Controller
             return redirect()->back()->with('error', 'Select payments to delete first.');
         }
 
+        $user = auth()->user();
         foreach ($ids as $id) {
             $payment = \App\Models\Payment::find($id);
             if ($payment) {
+                if ($user->role === 'admin' && $payment->ticket->participant->event_id !== $user->event_id) {
+                    continue; // Skip unauthorized deletion
+                }
                 if ($payment->ticket) {
                     $payment->ticket->update(['status' => 'pending']);
                 }
@@ -252,6 +380,10 @@ class AdminController extends Controller
     public function approvePayment($id)
     {
         $payment = \App\Models\Payment::findOrFail($id);
+        $user = auth()->user();
+        if ($user->role === 'admin' && $payment->ticket->participant->event_id !== $user->event_id) {
+            abort(403, 'Unauthorized action.');
+        }
         
         $payment->update(['payment_status' => 'paid']);
         
@@ -262,8 +394,29 @@ class AdminController extends Controller
             ]);
 
             $participant = $payment->ticket->participant;
-            $ticketUrl = route('ticket.show', $payment->ticket->ticket_code);
-            $waMessage = "🎉 *PEMBAYARAN BERHASIL* 🎉\n\nHalo *{$participant->fullname}*,\n\nPembayaran Anda untuk event FunRun 2026 telah berhasil diverifikasi!\n\n*Detail Tiket:*\nKode: {$payment->ticket->ticket_code}\nKategori: {$participant->category}\nJersey: {$participant->jersey_size}\n\nSilakan klik link di bawah ini untuk melihat E-Ticket dan QR Code Anda:\n{$ticketUrl}\n\nTerima kasih dan sampai jumpa di garis start!";
+            $pdfUrl = route('ticket.pdf', $payment->ticket->ticket_code);
+            
+            $categoryTitles = [
+                '3K' => '3K Fun Walk',
+                '5K' => '5K Night Run',
+                '10K' => '10K Challenger'
+            ];
+            $ticketTitle = $categoryTitles[$participant->category] ?? $participant->category;
+
+            $waMessage = "*PEMBAYARAN BERHASIL*\n" .
+                         "*SeTiket*\n\n" .
+                         "Halo *{$participant->fullname}*,\n\n" .
+                         "Pembayaran pendaftaran Anda untuk event *SeTiket* telah berhasil diverifikasi!\n\n" .
+                         "*Detail Peserta:*\n" .
+                         "• Nama Lengkap: *{$participant->fullname}*\n" .
+                         "• No. WhatsApp: *{$participant->phone}*\n" .
+                         "• Kode Tiket: *{$payment->ticket->ticket_code}*\n" .
+                         "• Kategori: *{$ticketTitle}*\n" .
+                         "• Ukuran Jersey: *{$participant->jersey_size}*\n\n" .
+                         "*Download PDF Resmi E-Ticket:*\n{$pdfUrl}\n\n" .
+                         "*Catatan:*\n" .
+                         "Silakan simpan link di atas atau unduh PDF tiket Anda. Tunjukkan QR Code pada tiket saat melakukan check-in di lokasi acara untuk pengambilan Race Pack & BIB.\n\n" .
+                         "Terima kasih atas partisipasi Anda, sampai jumpa di garis start!";
 
             // Attempt to send via Fonnte WA API (if configured in .env)
             $fonnteToken = env('FONNTE_TOKEN');
@@ -287,16 +440,79 @@ class AdminController extends Controller
         return redirect()->back()->with('success', 'Payment approved! Ticket validated and WA notification queued.');
     }
 
+    // ===== E-TICKET PDF =====
+
+    public function downloadEticket($ticket_code)
+    {
+        $ticket = \App\Models\Ticket::with(['participant.event'])
+            ->where('ticket_code', $ticket_code)
+            ->firstOrFail();
+
+        $user = auth()->user();
+        if ($user->role === 'admin' && $ticket->participant->event_id !== $user->event_id) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        // Fetch QR code as base64 so DomPDF can embed it without external HTTP requests
+        $qrBase64 = null;
+        if ($ticket->qr_code) {
+            $qrData = urlencode($ticket->qr_code);
+            $qrUrl  = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={$qrData}";
+            
+            // 1. Try Laravel Http Client
+            try {
+                $response = \Illuminate\Support\Facades\Http::withOptions([
+                    'verify' => false,
+                ])->timeout(5)->get($qrUrl);
+
+                if ($response->successful()) {
+                    $qrBase64 = 'data:image/png;base64,' . base64_encode($response->body());
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('QR fetch via Http client failed, trying fallback: ' . $e->getMessage());
+            }
+
+            // 2. Fallback to file_get_contents
+            if (empty($qrBase64)) {
+                try {
+                    $context = stream_context_create([
+                        'http' => [
+                            'timeout'     => 5,
+                            'user_agent'  => 'Mozilla/5.0',
+                        ],
+                        'ssl' => [
+                            'verify_peer'       => false,
+                            'verify_peer_name'  => false,
+                        ],
+                    ]);
+                    $imageData = @file_get_contents($qrUrl, false, $context);
+                    if ($imageData !== false) {
+                        $qrBase64 = 'data:image/png;base64,' . base64_encode($imageData);
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('QR fetch via file_get_contents failed: ' . $e->getMessage());
+                }
+            }
+        }
+
+        $pdf = Pdf::loadView('admin.eticket-pdf', compact('ticket', 'qrBase64'))
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->download('eticket-' . $ticket->ticket_code . '.pdf');
+    }
+
     // ===== EVENT MANAGEMENT =====
 
     public function events()
     {
+        $this->checkSuperAdmin();
         $events = \App\Http\Controllers\HomeController::loadEvents();
         return view('admin.events', compact('events'));
     }
 
     public function storeEvent(Request $request)
     {
+        $this->checkSuperAdmin();
         $request->validate([
             'nama'             => 'required|string|max:255',
             'lokasi'           => 'required|string|max:255',
@@ -319,26 +535,40 @@ class AdminController extends Controller
             $thumbnailPath = '/storage/' . $path;
         }
 
+        $newEventId = $maxId + 1;
         $events[] = [
-            'id'               => $maxId + 1,
+            'id'               => $newEventId,
             'nama'             => $request->nama,
             'lokasi'           => $request->lokasi,
             'tanggal'          => $request->tanggal,
             'harga'            => (int) $request->harga,
             'thumbnail'        => $thumbnailPath,
             'kategori'         => $request->kategori,
-            'urlBeli'          => $request->urlBeli ?: 'https://wa.me/6281393564042',
+            'urlBeli'          => $request->urlBeli ?: 'https://wa.me/6289681201941',
             'waktu'            => $request->waktu ?? '',
             'deskripsi'        => $request->deskripsi ?? '',
             'syarat_ketentuan' => $request->syarat_ketentuan ?? '',
         ];
 
         \App\Http\Controllers\HomeController::saveEvents($events);
+        
+        // Database sync
+        \App\Models\Event::updateOrCreate(
+            ['id' => $newEventId],
+            [
+                'title' => $request->nama,
+                'date' => self::parseDateString($request->tanggal),
+                'location' => $request->lokasi,
+                'quota' => 5000
+            ]
+        );
+
         return redirect()->route('admin.events')->with('success', 'Event berhasil ditambahkan!');
     }
 
     public function updateEvent(Request $request, $id)
     {
+        $this->checkSuperAdmin();
         $request->validate([
             'nama'             => 'required|string|max:255',
             'lokasi'           => 'required|string|max:255',
@@ -353,6 +583,7 @@ class AdminController extends Controller
         ]);
 
         $events = \App\Http\Controllers\HomeController::loadEvents();
+        $found = false;
         foreach ($events as &$ev) {
             if ($ev['id'] == $id) {
                 $ev['nama']             = $request->nama;
@@ -360,7 +591,7 @@ class AdminController extends Controller
                 $ev['tanggal']          = $request->tanggal;
                 $ev['harga']            = (int) $request->harga;
                 $ev['kategori']         = $request->kategori;
-                $ev['urlBeli']          = $request->urlBeli ?: 'https://wa.me/6281393564042';
+                $ev['urlBeli']          = $request->urlBeli ?: 'https://wa.me/6289681201941';
                 $ev['waktu']            = $request->waktu ?? '';
                 $ev['deskripsi']        = $request->deskripsi ?? '';
                 $ev['syarat_ketentuan'] = $request->syarat_ketentuan ?? '';
@@ -369,25 +600,49 @@ class AdminController extends Controller
                     $path = $request->file('thumbnail')->store('thumbnails', 'public');
                     $ev['thumbnail'] = '/storage/' . $path;
                 }
+                $found = true;
                 break;
             }
         }
         unset($ev);
 
-        \App\Http\Controllers\HomeController::saveEvents($events);
+        if ($found) {
+            \App\Http\Controllers\HomeController::saveEvents($events);
+            
+            // Database sync
+            \App\Models\Event::updateOrCreate(
+                ['id' => $id],
+                [
+                    'title' => $request->nama,
+                    'date' => self::parseDateString($request->tanggal),
+                    'location' => $request->lokasi,
+                    'quota' => 5000
+                ]
+            );
+        }
+
         return redirect()->route('admin.events')->with('success', 'Event berhasil diperbarui!');
     }
 
     public function destroyEvent($id)
     {
+        $this->checkSuperAdmin();
         $events = \App\Http\Controllers\HomeController::loadEvents();
         $events = array_values(array_filter($events, fn($e) => $e['id'] != $id));
         \App\Http\Controllers\HomeController::saveEvents($events);
+
+        // Delete from database
+        $dbEvent = \App\Models\Event::find($id);
+        if ($dbEvent) {
+            $dbEvent->delete();
+        }
+
         return redirect()->route('admin.events')->with('success', 'Event berhasil dihapus!');
     }
 
     public function bulkDestroyEvent(Request $request)
     {
+        $this->checkSuperAdmin();
         $ids = $request->input('ids', []);
         if (!is_array($ids) || empty($ids)) {
             return redirect()->back()->with('error', 'Pilih event yang ingin dihapus terlebih dahulu.');
@@ -397,6 +652,79 @@ class AdminController extends Controller
         $events = array_values(array_filter($events, fn($e) => !in_array($e['id'], $ids)));
         \App\Http\Controllers\HomeController::saveEvents($events);
 
+        // Delete from database
+        \App\Models\Event::whereIn('id', $ids)->delete();
+
         return redirect()->route('admin.events')->with('success', 'Event terpilih berhasil dihapus!');
+    }
+
+    // ===== ADMIN MANAGEMENT =====
+
+    public function admins()
+    {
+        $this->checkSuperAdmin();
+        $admins = \App\Models\User::with('event')->where('role', 'admin')->latest()->get();
+        
+        // Load events for the selection dropdown
+        $events = \App\Models\Event::all();
+        
+        return view('admin.admins', compact('admins', 'events'));
+    }
+
+    public function storeAdmin(Request $request)
+    {
+        $this->checkSuperAdmin();
+        $request->validate([
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|string|email|max:255|unique:users',
+            'password' => 'required|string|min:6',
+            'event_id' => 'required|exists:events,id',
+        ]);
+
+        \App\Models\User::create([
+            'name'     => $request->name,
+            'email'    => $request->email,
+            'password' => \Illuminate\Support\Facades\Hash::make($request->password),
+            'role'     => 'admin',
+            'event_id' => $request->event_id,
+        ]);
+
+        return redirect()->route('admin.admins')->with('success', 'Admin berhasil ditambahkan!');
+    }
+
+    public function updateAdmin(Request $request, $id)
+    {
+        $this->checkSuperAdmin();
+        $admin = \App\Models\User::findOrFail($id);
+
+        $request->validate([
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|string|email|max:255|unique:users,email,' . $id,
+            'password' => 'nullable|string|min:6',
+            'event_id' => 'required|exists:events,id',
+        ]);
+
+        $data = [
+            'name'     => $request->name,
+            'email'    => $request->email,
+            'event_id' => $request->event_id,
+        ];
+
+        if ($request->filled('password')) {
+            $data['password'] = \Illuminate\Support\Facades\Hash::make($request->password);
+        }
+
+        $admin->update($data);
+
+        return redirect()->route('admin.admins')->with('success', 'Admin berhasil diperbarui!');
+    }
+
+    public function destroyAdmin($id)
+    {
+        $this->checkSuperAdmin();
+        $admin = \App\Models\User::findOrFail($id);
+        $admin->delete();
+
+        return redirect()->route('admin.admins')->with('success', 'Admin berhasil dihapus!');
     }
 }

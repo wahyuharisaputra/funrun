@@ -15,6 +15,7 @@ Route::get('/event/{id}', [HomeController::class, 'showEvent'])->name('event.sho
 // Registration Flow
 Route::get('/register-event', [RegistrationController::class, 'showRegistrationForm'])->name('register');
 Route::post('/register-event', [RegistrationController::class, 'submitRegistration']);
+Route::get('/registration-success', [RegistrationController::class, 'success'])->name('registration.success');
 Route::get('/checkout/{participant_id}', [RegistrationController::class, 'checkout'])->name('checkout');
 
 // Payment Mock
@@ -22,6 +23,7 @@ Route::post('/pay/{ticket_id}', [PaymentController::class, 'processPayment'])->n
 
 // E-Ticket
 Route::get('/ticket/{ticket_code}', [TicketController::class, 'showTicket'])->name('ticket.show');
+Route::get('/ticket/{ticket_code}/pdf', [TicketController::class, 'downloadPdf'])->name('ticket.pdf');
 
 // Admin Panel
 Route::prefix('admin')->name('admin.')->group(function () {
@@ -44,12 +46,19 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('/payments/{id}/approve', [AdminController::class, 'approvePayment'])->name('payments.approve');
         Route::get('/scanner', [AdminController::class, 'scanner'])->name('scanner');
         Route::post('/scan', [AdminController::class, 'scanTicket'])->name('scan');
+        Route::get('/eticket/{ticket_code}/pdf', [AdminController::class, 'downloadEticket'])->name('eticket.pdf');
         // Event Management
         Route::get('/events', [AdminController::class, 'events'])->name('events');
         Route::post('/events', [AdminController::class, 'storeEvent'])->name('events.store');
         Route::post('/events/bulk-delete', [AdminController::class, 'bulkDestroyEvent'])->name('events.bulk-destroy');
         Route::put('/events/{id}', [AdminController::class, 'updateEvent'])->name('events.update');
         Route::delete('/events/{id}', [AdminController::class, 'destroyEvent'])->name('events.destroy');
+
+        // Admin Management
+        Route::get('/admins', [AdminController::class, 'admins'])->name('admins');
+        Route::post('/admins', [AdminController::class, 'storeAdmin'])->name('admins.store');
+        Route::put('/admins/{id}', [AdminController::class, 'updateAdmin'])->name('admins.update');
+        Route::delete('/admins/{id}', [AdminController::class, 'destroyAdmin'])->name('admins.destroy');
     });
 });
 

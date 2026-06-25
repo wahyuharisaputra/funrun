@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Pendaftaran ' . $event['nama'] . ' — FunRun 2026')
+@section('title', 'Pendaftaran ' . $event['nama'] . ' — SeTiket')
 
 @section('content')
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 mt-10">
@@ -46,6 +46,13 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-300 mb-2">Nama Lengkap (sesuai KTP) *</label>
                                 <input type="text" name="fullname" required value="{{ old('fullname') }}"
+                                       class="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-transparent transition-all">
+                            </div>
+
+                            <!-- NIK -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">NIK (16 Digit) *</label>
+                                <input type="text" name="nik" required minlength="16" maxlength="16" pattern="[0-9]{16}" oninput="this.value = this.value.replace(/[^0-9]/g, '')" value="{{ old('nik') }}" placeholder="contoh: 3578123456789012"
                                        class="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-transparent transition-all">
                             </div>
 
@@ -119,6 +126,21 @@
                                       class="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-transparent transition-all">{{ old('address') }}</textarea>
                         </div>
 
+                        <!-- Asal Kota/Kabupaten -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Asal Kota/Kabupaten *</label>
+                            <input type="text" name="city" required value="{{ old('city') }}" placeholder="contoh: Kota Surabaya"
+                                   class="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-transparent transition-all">
+                        </div>
+
+                        <!-- Riwayat Penyakit -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Riwayat Penyakit (Jika Ada)</label>
+                            <textarea name="medical_history" rows="2" placeholder="Contoh: Asma, Jantung, Diabetes, dll. Kosongkan jika tidak ada."
+                                      class="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-transparent transition-all">{{ old('medical_history') }}</textarea>
+                            <p class="text-xs text-gray-500 mt-1">Opsional — untuk keamanan dan kesiapan medis selama event</p>
+                        </div>
+
                         <div class="pt-4 flex justify-end" id="btnNextContainer">
                             <button type="button" id="btnNext"
                                     class="w-full md:w-auto px-10 py-4 rounded-2xl font-bold text-lg transition-all transform hover:-translate-y-1 hover:shadow-2xl"
@@ -144,7 +166,7 @@
                                     <div class="p-4 rounded-xl border border-white/10 bg-slate-950/40 hover:bg-slate-900/30 peer-checked:border-amber-500 peer-checked:bg-amber-500/10 transition-all">
                                         <div class="font-bold text-white mb-1">Transfer Bank BCA</div>
                                         <div class="text-xs text-amber-400 font-mono tracking-wider font-bold">No. Rek: 80771234567890</div>
-                                        <div class="text-xs text-gray-400 mt-1">a.n. FunRun Organizer</div>
+                                        <div class="text-xs text-gray-400 mt-1">a.n. SeTiket Organizer</div>
                                     </div>
                                 </label>
                                 <label class="relative cursor-pointer block">
@@ -152,7 +174,7 @@
                                     <div class="p-4 rounded-xl border border-white/10 bg-slate-950/40 hover:bg-slate-900/30 peer-checked:border-amber-500 peer-checked:bg-amber-500/10 transition-all">
                                         <div class="font-bold text-white mb-1">E-Wallet DANA</div>
                                         <div class="text-xs text-amber-400 font-mono tracking-wider font-bold">No. HP: 081234567890</div>
-                                        <div class="text-xs text-gray-400 mt-1">a.n. FunRun Organizer</div>
+                                        <div class="text-xs text-gray-400 mt-1">a.n. SeTiket Organizer</div>
                                     </div>
                                 </label>
                             </div>
@@ -315,7 +337,9 @@ document.addEventListener('DOMContentLoaded', function() {
             regForm.querySelector('[name="gender"]'),
             regForm.querySelector('[name="jersey_size"]'),
             regForm.querySelector('[name="emergency_contact"]'),
-            regForm.querySelector('[name="address"]')
+            regForm.querySelector('[name="address"]'),
+            regForm.querySelector('[name="nik"]'),
+            regForm.querySelector('[name="city"]')
         ];
 
         // Check if all fields are valid

@@ -43,7 +43,7 @@ class HomeController extends Controller
                 'harga'     => 100000,
                 'thumbnail' => '',
                 'kategori'  => 'upcoming',
-                'urlBeli'   => 'https://wa.me/6281393564042',
+                'urlBeli'   => 'https://wa.me/6289681201941',
             ],
             [
                 'id'        => 2,
@@ -53,7 +53,7 @@ class HomeController extends Controller
                 'harga'     => 145000,
                 'thumbnail' => '',
                 'kategori'  => 'upcoming',
-                'urlBeli'   => 'https://wa.me/6281393564042',
+                'urlBeli'   => 'https://wa.me/6289681201941',
             ],
             [
                 'id'        => 3,
@@ -63,7 +63,7 @@ class HomeController extends Controller
                 'harga'     => 105000,
                 'thumbnail' => '',
                 'kategori'  => 'upcoming',
-                'urlBeli'   => 'https://wa.me/6281393564042',
+                'urlBeli'   => 'https://wa.me/6289681201941',
             ],
             [
                 'id'        => 4,
@@ -73,7 +73,7 @@ class HomeController extends Controller
                 'harga'     => 55000,
                 'thumbnail' => '',
                 'kategori'  => 'upcoming',
-                'urlBeli'   => 'https://wa.me/6281393564042',
+                'urlBeli'   => 'https://wa.me/6289681201941',
             ],
             [
                 'id'        => 5,
@@ -83,7 +83,7 @@ class HomeController extends Controller
                 'harga'     => 85000,
                 'thumbnail' => '',
                 'kategori'  => 'upcoming',
-                'urlBeli'   => 'https://wa.me/6281393564042',
+                'urlBeli'   => 'https://wa.me/6289681201941',
             ],
             [
                 'id'        => 6,
@@ -93,7 +93,7 @@ class HomeController extends Controller
                 'harga'     => 90000,
                 'thumbnail' => '',
                 'kategori'  => 'upcoming',
-                'urlBeli'   => 'https://wa.me/6281393564042',
+                'urlBeli'   => 'https://wa.me/6289681201941',
             ],
             [
                 'id'        => 7,
@@ -103,7 +103,7 @@ class HomeController extends Controller
                 'harga'     => 0,
                 'thumbnail' => '',
                 'kategori'  => 'upcoming',
-                'urlBeli'   => 'https://wa.me/6281393564042',
+                'urlBeli'   => 'https://wa.me/6289681201941',
             ],
             [
                 'id'        => 8,
@@ -113,7 +113,7 @@ class HomeController extends Controller
                 'harga'     => 80000,
                 'thumbnail' => '',
                 'kategori'  => 'upcoming',
-                'urlBeli'   => 'https://wa.me/6281393564042',
+                'urlBeli'   => 'https://wa.me/6289681201941',
             ],
             [
                 'id'        => 9,
@@ -123,7 +123,7 @@ class HomeController extends Controller
                 'harga'     => 150000,
                 'thumbnail' => '',
                 'kategori'  => 'highlight',
-                'urlBeli'   => 'https://wa.me/6281393564042',
+                'urlBeli'   => 'https://wa.me/6289681201941',
             ],
             [
                 'id'        => 10,
@@ -133,7 +133,7 @@ class HomeController extends Controller
                 'harga'     => 250000,
                 'thumbnail' => '',
                 'kategori'  => 'highlight',
-                'urlBeli'   => 'https://wa.me/6281393564042',
+                'urlBeli'   => 'https://wa.me/6289681201941',
             ],
             [
                 'id'        => 11,
@@ -143,7 +143,7 @@ class HomeController extends Controller
                 'harga'     => 150000,
                 'thumbnail' => '',
                 'kategori'  => 'highlight',
-                'urlBeli'   => 'https://wa.me/6281393564042',
+                'urlBeli'   => 'https://wa.me/6289681201941',
             ],
             [
                 'id'        => 12,
@@ -153,7 +153,7 @@ class HomeController extends Controller
                 'harga'     => 175000,
                 'thumbnail' => '',
                 'kategori'  => 'highlight',
-                'urlBeli'   => 'https://wa.me/6281393564042',
+                'urlBeli'   => 'https://wa.me/6289681201941',
             ],
         ];
     }

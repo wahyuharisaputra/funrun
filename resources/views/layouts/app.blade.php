@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@yield('title', 'FunRun 2026')</title>
+    <title>@yield('title', 'SeTiket')</title>
+    <link rel="icon" type="image/webp" href="{{ asset('images/setiket.webp') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -35,12 +36,9 @@
     <!-- Navbar -->
     <nav class="fixed w-full z-50 glass-panel border-b-0 border-white/5 transition-all duration-300" id="navbar">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-20">
+             <div class="flex justify-between items-center h-20">
                 <div class="flex-shrink-0 flex items-center gap-2 cursor-pointer" onclick="window.location.href='{{ route('home') }}'">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-500/30">
-                        FR
-                    </div>
-                    <span class="font-bold text-lg sm:text-2xl tracking-tight">FunRun <span class="gradient-text">2026</span></span>
+                    <img src="{{ asset('images/setiket.webp') }}" alt="SeTiket Logo" class="h-10 sm:h-12 w-auto object-contain transition-all duration-300">
                 </div>
                 
                 <!-- Search Panel -->
@@ -71,13 +69,10 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex flex-col md:flex-row justify-between items-center">
                 <div class="flex items-center gap-2 mb-4 md:mb-0">
-                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold text-sm shadow-lg">
-                        FR
-                    </div>
-                    <span class="font-bold text-xl">FunRun 2026</span>
+                    <img src="{{ asset('images/setiket.webp') }}" alt="SeTiket Logo" class="h-8 w-auto object-contain">
                 </div>
                 <div class="text-gray-400 text-sm">
-                    &copy; 2026 FunRun Event Organizer. All rights reserved.
+                    &copy; 2026 SeTiket. All rights reserved.
                 </div>
                 <div class="flex space-x-4 mt-4 md:mt-0">
                     <a href="#" class="text-gray-400 hover:text-white transition-colors">Instagram</a>

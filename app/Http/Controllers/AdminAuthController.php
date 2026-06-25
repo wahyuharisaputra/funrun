@@ -8,7 +8,7 @@ class AdminAuthController extends Controller
 {
     public function showLoginForm()
     {
-        if (\Illuminate\Support\Facades\Auth::check() && \Illuminate\Support\Facades\Auth::user()->role === 'admin') {
+        if (\Illuminate\Support\Facades\Auth::check() && in_array(\Illuminate\Support\Facades\Auth::user()->role, ['admin', 'super_admin'])) {
             return redirect()->route('admin.dashboard');
         }
         return view('admin.login');
@@ -21,9 +21,13 @@ class AdminAuthController extends Controller
             'password' => 'required'
         ]);
 
-        if (\Illuminate\Support\Facades\Auth::attempt(['email' => $credentials['email'], 'password' => $credentials['password'], 'role' => 'admin'])) {
-            $request->session()->regenerate();
-            return redirect()->intended(route('admin.dashboard'));
+        if (\Illuminate\Support\Facades\Auth::attempt($credentials)) {
+            $user = \Illuminate\Support\Facades\Auth::user();
+            if (in_array($user->role, ['admin', 'super_admin'])) {
+                $request->session()->regenerate();
+                return redirect()->intended(route('admin.dashboard'));
+            }
+            \Illuminate\Support\Facades\Auth::logout();
         }
 
         return back()->withErrors([

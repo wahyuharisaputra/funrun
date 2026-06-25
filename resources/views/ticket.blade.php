@@ -17,7 +17,7 @@
             <div class="absolute -left-4 bottom-[-16px] w-8 h-8 rounded-full bg-[#0f172a]"></div>
             <div class="absolute -right-4 bottom-[-16px] w-8 h-8 rounded-full bg-[#0f172a]"></div>
 
-            <h2 class="text-3xl font-extrabold tracking-tight mb-2">{{ $ticket->participant->event->title ?? 'FunRun 2026' }}</h2>
+            <h2 class="text-3xl font-extrabold tracking-tight mb-2">{{ $ticket->participant->event->title ?? 'SeTiket' }}</h2>
             <p class="text-gray-400 mb-6">{{ \Carbon\Carbon::parse($ticket->participant->event->date ?? '2026-09-15')->format('F d, Y') }} | {{ $ticket->participant->event->location ?? 'City Square' }}</p>
             
             <div class="inline-block bg-white p-4 rounded-2xl mb-8 shadow-xl">
