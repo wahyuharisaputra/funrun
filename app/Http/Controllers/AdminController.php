@@ -20,12 +20,26 @@ class AdminController extends Controller
     {
         $query = \App\Models\Participant::with(['ticket.payments', 'user'])->latest();
 
-        if ($request->has('category') && $request->category !== 'all') {
-            $query->where('category', $request->category);
+        $currentCategory = $request->category ?? 'all';
+        if ($currentCategory !== 'all') {
+            $query->where('category', $currentCategory);
         }
 
-        $participants = $query->get();
-        $currentCategory = $request->category ?? 'all';
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('fullname', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%")
+                  ->orWhereHas('user', function($qu) use ($search) {
+                      $qu->where('email', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('ticket', function($qt) use ($search) {
+                      $qt->where('ticket_code', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $participants = $query->paginate(10)->withQueryString();
 
         return view('admin.participants', compact('participants', 'currentCategory'));
     }
@@ -65,6 +79,27 @@ class AdminController extends Controller
         return redirect()->back()->with('success', 'Participant deleted successfully!');
     }
 
+    public function bulkDestroyParticipant(Request $request)
+    {
+        $ids = $request->input('ids', []);
+        if (!is_array($ids) || empty($ids)) {
+            return redirect()->back()->with('error', 'Select participants to delete first.');
+        }
+
+        foreach ($ids as $id) {
+            $participant = \App\Models\Participant::find($id);
+            if ($participant) {
+                if ($participant->ticket) {
+                    $participant->ticket->payments()->delete();
+                    $participant->ticket()->delete();
+                }
+                $participant->delete();
+            }
+        }
+
+        return redirect()->back()->with('success', 'Selected participants deleted successfully!');
+    }
+
     public function scanner()
     {
         return view('admin.scanner');
@@ -100,9 +135,29 @@ class AdminController extends Controller
         ]);
     }
 
-    public function exportCSV()
+    public function exportCSV(Request $request)
     {
-        $participants = \App\Models\Participant::with(['user', 'ticket.payments'])->get();
+        $query = \App\Models\Participant::with(['user', 'ticket.payments'])->latest();
+
+        if ($request->has('category') && $request->category !== 'all') {
+            $query->where('category', $request->category);
+        }
+
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('fullname', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%")
+                  ->orWhereHas('user', function($qu) use ($search) {
+                      $qu->where('email', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('ticket', function($qt) use ($search) {
+                      $qt->where('ticket_code', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $participants = $query->get();
         
         $filename = "participants_funrun_2026.csv";
         
@@ -148,14 +203,50 @@ class AdminController extends Controller
     {
         $query = \App\Models\Payment::with(['ticket.participant'])->latest();
 
-        if ($request->has('status') && $request->status !== 'all') {
-            $query->where('payment_status', $request->status);
+        $currentStatus = $request->status ?? 'all';
+        if ($currentStatus !== 'all') {
+            $query->where('payment_status', $currentStatus);
         }
 
-        $payments = $query->get();
-        $currentStatus = $request->status ?? 'all';
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('payment_method', 'like', "%{$search}%")
+                  ->orWhere('payment_status', 'like', "%{$search}%")
+                  ->orWhere('amount', 'like', "%{$search}%")
+                  ->orWhereHas('ticket', function($qt) use ($search) {
+                      $qt->where('ticket_code', 'like', "%{$search}%")
+                        ->orWhereHas('participant', function($qp) use ($search) {
+                            $qp->where('fullname', 'like', "%{$search}%")
+                              ->orWhere('phone', 'like', "%{$search}%");
+                        });
+                  });
+            });
+        }
+
+        $payments = $query->paginate(10)->withQueryString();
 
         return view('admin.payments', compact('payments', 'currentStatus'));
+    }
+
+    public function bulkDestroyPayment(Request $request)
+    {
+        $ids = $request->input('ids', []);
+        if (!is_array($ids) || empty($ids)) {
+            return redirect()->back()->with('error', 'Select payments to delete first.');
+        }
+
+        foreach ($ids as $id) {
+            $payment = \App\Models\Payment::find($id);
+            if ($payment) {
+                if ($payment->ticket) {
+                    $payment->ticket->update(['status' => 'pending']);
+                }
+                $payment->delete();
+            }
+        }
+
+        return redirect()->back()->with('success', 'Selected payments deleted successfully!');
     }
 
     public function approvePayment($id)
