@@ -184,7 +184,7 @@ class AdminController extends Controller
                         'target' => $participant->phone,
                         'message' => $waMessage,
                     ]);
-                } catch (\Exception $e) {
+                } catch (\Throwable $e) {
                     \Illuminate\Support\Facades\Log::error('WA API Error: ' . $e->getMessage());
                 }
             } else {

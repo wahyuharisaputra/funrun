@@ -57,7 +57,11 @@
                             @else
                                 <span class="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-xs font-medium">Pending</span>
                             @endif
-                            <div class="text-xs text-slate-500 mt-1 font-mono">{{ $participant->ticket->ticket_code }}</div>
+                            <div class="text-xs text-slate-500 mt-1 font-mono">
+                                <a href="{{ route('ticket.show', $participant->ticket->ticket_code) }}" target="_blank" class="text-blue-600 hover:underline">
+                                    {{ $participant->ticket->ticket_code }}
+                                </a>
+                            </div>
                         @else
                             <span class="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-medium">No Ticket</span>
                         @endif
