@@ -11,7 +11,7 @@ class RegistrationController extends Controller
         $eventId = $request->query('event_id', 1);
         $events = \App\Http\Controllers\HomeController::loadEvents();
         $event = collect($events)->firstWhere('id', (int)$eventId);
-
+ 
         if (!$event) {
             // Fallback to first event or default
             $event = count($events) > 0 ? $events[0] : [
@@ -24,17 +24,72 @@ class RegistrationController extends Controller
                 'waktu' => '16.00 - 23.00'
             ];
         }
-
+ 
         // Apply fallbacks
         if (empty($event['waktu'])) {
             $event['waktu'] = '16.00 - 23.00';
         }
 
-        return view('register', compact('event'));
-    }
+        // Ensure the event exists in the database
+        $dbEvent = \App\Models\Event::firstOrCreate(
+            ['id' => $event['id']],
+            [
+                'title' => $event['nama'] ?? 'SeTiket',
+                'date' => \App\Http\Controllers\AdminController::parseDateString($event['tanggal'] ?? ''),
+                'location' => $event['lokasi'] ?? 'City Square',
+                'quota' => 5000
+            ]
+        );
 
+        // Seed default categories if none exist yet in DB
+        if ($dbEvent->categories()->count() === 0) {
+            $dbEvent->categories()->createMany([
+                ['name' => '3K Fun Walk', 'code' => '3K', 'bib_code' => 'FW', 'price' => 100000],
+                ['name' => '5K Night Run', 'code' => '5K', 'bib_code' => 'NR', 'price' => 150000],
+                ['name' => '10K Challenger', 'code' => '10K', 'bib_code' => 'CH', 'price' => 250000],
+            ]);
+        }
+
+        $categories = $dbEvent->categories;
+
+        $paymentMethods = $event['payment_methods'] ?? [];
+        if (empty($paymentMethods)) {
+            $paymentMethods = [
+                [
+                    'name' => 'Transfer Bank BCA',
+                    'account_number' => '80771234567890',
+                    'account_holder' => 'SeTiket Organizer'
+                ],
+                [
+                    'name' => 'E-Wallet DANA',
+                    'account_number' => '081234567890',
+                    'account_holder' => 'SeTiket Organizer'
+                ]
+            ];
+        }
+ 
+        return view('register', compact('event', 'categories', 'paymentMethods'));
+    }
+ 
     public function submitRegistration(Request $request)
     {
+        $eventId = $request->input('event_id', 1);
+        $validCategories = \App\Models\EventCategory::where('event_id', $eventId)->pluck('code')->toArray();
+        if (empty($validCategories)) {
+            $validCategories = ['3K', '5K', '10K'];
+        }
+
+        $events = \App\Http\Controllers\HomeController::loadEvents();
+        $jsonEvent = collect($events)->firstWhere('id', (int)$eventId);
+        $paymentMethods = $jsonEvent['payment_methods'] ?? [];
+        if (empty($paymentMethods)) {
+            $paymentMethods = [
+                ['name' => 'Transfer Bank BCA'],
+                ['name' => 'E-Wallet DANA']
+            ];
+        }
+        $validPaymentMethods = collect($paymentMethods)->pluck('name')->toArray();
+
         $validated = $request->validate([
             'fullname'          => 'required|string|max:255',
             'email'             => 'required|email|max:255',
@@ -47,38 +102,40 @@ class RegistrationController extends Controller
             'medical_history'   => 'nullable|string|max:1000',
             'jersey_size'       => 'required|in:S,M,L,XL,XXL',
             'emergency_contact' => 'required|string|max:255',
-            'category'          => 'required|in:3K,5K,10K',
+            'category'          => 'required|in:' . implode(',', $validCategories),
             'event_id'          => 'required|integer',
-            'payment_method'    => 'required|in:bank_transfer,ewallet',
+            'payment_method'    => 'required|in:' . implode(',', $validPaymentMethods),
             'proof'             => 'required|image|mimes:jpeg,png,jpg,gif|max:2048'
         ], [
             'nik.required' => 'NIK wajib diisi.',
             'nik.size'     => 'NIK harus terdiri dari 16 digit.',
             'nik.regex'    => 'NIK hanya boleh berisi angka.',
             'city.required' => 'Asal Kota/Kabupaten wajib diisi.',
+            'payment_method.in' => 'Metode pembayaran tidak valid.',
         ]);
-
+ 
         // 1. Create or Find User
         $user = \App\Models\User::firstOrCreate(
             ['email' => $validated['email']],
             ['name' => $validated['fullname'], 'password' => bcrypt('password'), 'role' => 'participant']
         );
-
+ 
         // 2. Find or Create Event in Database
-        $eventId = $validated['event_id'];
         $events = \App\Http\Controllers\HomeController::loadEvents();
         $jsonEvent = collect($events)->firstWhere('id', (int)$eventId);
-
+ 
         $title = $jsonEvent['nama'] ?? 'SeTiket';
         
-        // Parse a database-friendly date format
-        $date = '2026-09-15';
-
         $event = \App\Models\Event::firstOrCreate(
             ['id' => $eventId],
-            ['title' => $title, 'date' => $date, 'location' => $jsonEvent['lokasi'] ?? 'City Square', 'quota' => 5000]
+            [
+                'title' => $title,
+                'date' => \App\Http\Controllers\AdminController::parseDateString($jsonEvent['tanggal'] ?? ''),
+                'location' => $jsonEvent['lokasi'] ?? 'City Square',
+                'quota' => 5000
+            ]
         );
-
+ 
         // 3. Create Participant
         $participant = \App\Models\Participant::create([
             'user_id'           => $user->id,
@@ -95,31 +152,32 @@ class RegistrationController extends Controller
             'emergency_contact' => $validated['emergency_contact'],
             'category'          => $validated['category'],
         ]);
-
-        // 4. Determine price based on category
-        $prices = [
-            '3K' => 100000,
-            '5K' => 150000,
-            '10K' => 250000
-        ];
-        $price = $prices[$validated['category']];
-
+ 
+        // 4. Determine price and BIB code based on category in DB
+        $categoryModel = \App\Models\EventCategory::where('event_id', $event->id)
+            ->where('code', $validated['category'])
+            ->first();
+        
+        $price = $categoryModel ? $categoryModel->price : 100000;
+        $bibCode = $categoryModel ? $categoryModel->bib_code : 'FW';
+ 
         // 5. Generate Ticket
-        $categoryCount = \App\Models\Participant::where('category', $validated['category'])
+        $categoryCount = \App\Models\Participant::where('event_id', $event->id)
+                                                ->where('category', $validated['category'])
                                                 ->whereHas('ticket')
                                                 ->count();
         $newNumber = $categoryCount + 1;
-        $ticketCode = 'ST-' . $validated['category'] . '-' . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
-
+        $ticketCode = 'ST-' . $validated['category'] . '-' . $bibCode . '-' . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
+ 
         $ticket = \App\Models\Ticket::create([
             'participant_id' => $participant->id,
             'ticket_code'    => $ticketCode,
             'status'         => 'pending'
         ]);
-
+ 
         // 6. Save Proof of Payment file
         $path = $request->file('proof')->store('proofs', 'public');
-
+ 
         // 7. Create Payment record
         $payment = \App\Models\Payment::create([
             'ticket_id'        => $ticket->id,
@@ -128,50 +186,50 @@ class RegistrationController extends Controller
             'payment_status'   => 'waiting_verification',
             'proof_of_payment' => $path
         ]);
-
+ 
         return redirect()->route('registration.success')
             ->with('success', 'Pendaftaran berhasil! Bukti pembayaran telah diunggah. Silakan tunggu verifikasi admin.');
     }
-
+ 
     public function success()
     {
         return view('registration-success');
     }
-
+ 
     public function checkout($participant_id)
     {
         $participant = \App\Models\Participant::findOrFail($participant_id);
         
-        $prices = [
-            '3K' => 100000,
-            '5K' => 150000,
-            '10K' => 250000
-        ];
+        $categoryModel = \App\Models\EventCategory::where('event_id', $participant->event_id)
+            ->where('code', $participant->category)
+            ->first();
         
-        $price = $prices[$participant->category];
-
+        $price = $categoryModel ? $categoryModel->price : 100000;
+        $bibCode = $categoryModel ? $categoryModel->bib_code : 'FW';
+ 
         $ticket = \App\Models\Ticket::where('participant_id', $participant->id)->first();
         
         if (!$ticket) {
-            $categoryCount = \App\Models\Participant::where('category', $participant->category)
+            $categoryCount = \App\Models\Participant::where('event_id', $participant->event_id)
+                                                    ->where('category', $participant->category)
                                                     ->whereHas('ticket')
                                                     ->count();
             $newNumber = $categoryCount + 1;
-            $ticketCode = 'ST-' . $participant->category . '-' . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
-
+            $ticketCode = 'ST-' . $participant->category . '-' . $bibCode . '-' . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
+ 
             $ticket = \App\Models\Ticket::create([
                 'participant_id' => $participant->id,
                 'ticket_code' => $ticketCode,
                 'status' => 'pending'
             ]);
         }
-
+ 
         // Create Payment record
         $payment = \App\Models\Payment::firstOrCreate(
             ['ticket_id' => $ticket->id],
             ['amount' => $price, 'payment_status' => 'pending']
         );
-
+ 
         return view('checkout', compact('participant', 'ticket', 'payment', 'price'));
     }
 }

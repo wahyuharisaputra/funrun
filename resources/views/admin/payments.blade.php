@@ -118,12 +118,10 @@
                                         $p = $payment->ticket->participant;
                                         $t = $payment->ticket;
                                         
-                                        $categoryTitles = [
-                                            '3K' => '3K Fun Walk',
-                                            '5K' => '5K Night Run',
-                                            '10K' => '10K Challenger'
-                                        ];
-                                        $ticketTitle = $categoryTitles[$p->category] ?? $p->category;
+                                        $categoryModel = \App\Models\EventCategory::where('event_id', $p->event_id)
+                                            ->where('code', $p->category)
+                                            ->first();
+                                        $ticketTitle = $categoryModel ? $categoryModel->name : $p->category;
 
                                         $rawWaText = "*PEMBAYARAN BERHASIL*\n" .
                                                      "*SeTiket*\n\n" .

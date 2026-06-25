@@ -28,9 +28,9 @@
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Category</label>
                     <select name="category" required class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="3K" {{ $participant->category == '3K' ? 'selected' : '' }}>3K Run</option>
-                        <option value="5K" {{ $participant->category == '5K' ? 'selected' : '' }}>5K Run</option>
-                        <option value="10K" {{ $participant->category == '10K' ? 'selected' : '' }}>10K Run</option>
+                        @foreach($categories as $cat)
+                            <option value="{{ $cat->code }}" {{ $participant->category == $cat->code ? 'selected' : '' }}>{{ $cat->name }}</option>
+                        @endforeach
                     </select>
                 </div>
                 <div>

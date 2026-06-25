@@ -112,9 +112,9 @@
                                 <label class="block text-sm font-medium text-gray-300 mb-2">Kategori Run *</label>
                                 <select name="category" id="categorySelect" required
                                         class="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-transparent transition-all bg-slate-950">
-                                    <option value="3K" {{ old('category') === '3K' ? 'selected' : '' }}>3K Fun Walk (Rp 100.000)</option>
-                                    <option value="5K" {{ old('category') === '5K' ? 'selected' : '' }}>5K Night Run (Rp 150.000)</option>
-                                    <option value="10K" {{ old('category') === '10K' ? 'selected' : '' }}>10K Challenger (Rp 250.000)</option>
+                                    @foreach($categories as $cat)
+                                        <option value="{{ $cat->code }}" {{ old('category') === $cat->code ? 'selected' : '' }}>{{ $cat->name }} (Rp {{ number_format($cat->price, 0, ',', '.') }})</option>
+                                    @endforeach
                                 </select>
                             </div>
                         </div>
@@ -161,22 +161,23 @@
                             <div class="text-sm text-gray-400">Silakan lakukan transfer ke salah satu metode pembayaran di bawah ini sebesar jumlah yang tertera di ringkasan pembelian.</div>
                             
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                @foreach($paymentMethods as $index => $pm)
                                 <label class="relative cursor-pointer block">
-                                    <input type="radio" name="payment_method" value="bank_transfer" class="peer sr-only" checked>
+                                    <input type="radio" name="payment_method" value="{{ $pm['name'] }}" class="peer sr-only" {{ $index === 0 ? 'checked' : '' }}>
                                     <div class="p-4 rounded-xl border border-white/10 bg-slate-950/40 hover:bg-slate-900/30 peer-checked:border-amber-500 peer-checked:bg-amber-500/10 transition-all">
-                                        <div class="font-bold text-white mb-1">Transfer Bank BCA</div>
-                                        <div class="text-xs text-amber-400 font-mono tracking-wider font-bold">No. Rek: 80771234567890</div>
-                                        <div class="text-xs text-gray-400 mt-1">a.n. SeTiket Organizer</div>
+                                        <div class="font-bold text-white mb-1">{{ $pm['name'] }}</div>
+                                        <div class="text-xs text-amber-400 font-mono tracking-wider font-bold">
+                                            @if(stripos($pm['name'], 'e-wallet') !== false || stripos($pm['name'], 'dana') !== false || stripos($pm['name'], 'gopay') !== false || stripos($pm['name'], 'ovo') !== false || stripos($pm['name'], 'linkaja') !== false)
+                                                No. HP:
+                                            @else
+                                                No. Rek:
+                                            @endif
+                                            {{ $pm['account_number'] }}
+                                        </div>
+                                        <div class="text-xs text-gray-400 mt-1">a.n. {{ $pm['account_holder'] }}</div>
                                     </div>
                                 </label>
-                                <label class="relative cursor-pointer block">
-                                    <input type="radio" name="payment_method" value="ewallet" class="peer sr-only">
-                                    <div class="p-4 rounded-xl border border-white/10 bg-slate-950/40 hover:bg-slate-900/30 peer-checked:border-amber-500 peer-checked:bg-amber-500/10 transition-all">
-                                        <div class="font-bold text-white mb-1">E-Wallet DANA</div>
-                                        <div class="text-xs text-amber-400 font-mono tracking-wider font-bold">No. HP: 081234567890</div>
-                                        <div class="text-xs text-gray-400 mt-1">a.n. SeTiket Organizer</div>
-                                    </div>
-                                </label>
+                                @endforeach
                             </div>
                         </div>
 
@@ -306,20 +307,28 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Category Price mapping
     const categories = {
-        '3K': { name: '3K Fun Walk', price: 100000, formatted: 'Rp 100.000', desc: 'Pendaftaran Kategori 3K Walk' },
-        '5K': { name: '5K Night Run', price: 150000, formatted: 'Rp 150.000', desc: 'Pendaftaran Kategori 5K Run' },
-        '10K': { name: '10K Challenger', price: 250000, formatted: 'Rp 250.000', desc: 'Pendaftaran Kategori 10K Run' }
+        @foreach($categories as $cat)
+        '{{ $cat->code }}': { 
+            name: '{{ $cat->name }}', 
+            price: {{ $cat->price }}, 
+            formatted: 'Rp {{ number_format($cat->price, 0, ",", ".") }}', 
+            desc: 'Pendaftaran Kategori {{ $cat->name }}' 
+        },
+        @endforeach
     };
 
     // Update summary column based on selected category
     function updateSummary() {
         const selected = categorySelect.value;
-        const info = categories[selected] || categories['3K'];
+        const firstKey = Object.keys(categories)[0];
+        const info = categories[selected] || categories[firstKey];
         
-        summaryCategory.textContent = info.name;
-        summaryPrice.textContent = info.formatted;
-        summaryDesc.textContent = info.desc;
-        summaryTotal.textContent = info.formatted;
+        if (info) {
+            summaryCategory.textContent = info.name;
+            summaryPrice.textContent = info.formatted;
+            summaryDesc.textContent = info.desc;
+            summaryTotal.textContent = info.formatted;
+        }
     }
 
     // Trigger update on load and change

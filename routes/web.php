@@ -54,9 +54,16 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::put('/events/{id}', [AdminController::class, 'updateEvent'])->name('events.update');
         Route::delete('/events/{id}', [AdminController::class, 'destroyEvent'])->name('events.destroy');
 
+        // Event Category Management
+        Route::get('/events/{id}/categories', [AdminController::class, 'eventCategories'])->name('events.categories');
+        Route::post('/events/{id}/categories', [AdminController::class, 'storeEventCategory'])->name('events.categories.store');
+        Route::put('/events/categories/{category_id}', [AdminController::class, 'updateEventCategory'])->name('events.categories.update');
+        Route::delete('/events/categories/{category_id}', [AdminController::class, 'destroyEventCategory'])->name('events.categories.destroy');
+
         // Admin Management
         Route::get('/admins', [AdminController::class, 'admins'])->name('admins');
         Route::post('/admins', [AdminController::class, 'storeAdmin'])->name('admins.store');
+        Route::post('/admins/bulk-delete', [AdminController::class, 'bulkDestroyAdmin'])->name('admins.bulk-destroy');
         Route::put('/admins/{id}', [AdminController::class, 'updateAdmin'])->name('admins.update');
         Route::delete('/admins/{id}', [AdminController::class, 'destroyAdmin'])->name('admins.destroy');
     });

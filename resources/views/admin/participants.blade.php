@@ -21,9 +21,9 @@
 
                 <select name="category" onchange="this.form.submit()" class="border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="all" {{ $currentCategory == 'all' ? 'selected' : '' }}>All Categories</option>
-                    <option value="3K" {{ $currentCategory == '3K' ? 'selected' : '' }}>3K Run</option>
-                    <option value="5K" {{ $currentCategory == '5K' ? 'selected' : '' }}>5K Run</option>
-                    <option value="10K" {{ $currentCategory == '10K' ? 'selected' : '' }}>10K Run</option>
+                    @foreach($categories as $cat)
+                        <option value="{{ $cat->code }}" {{ $currentCategory == $cat->code ? 'selected' : '' }}>{{ $cat->name }}</option>
+                    @endforeach
                 </select>
 
                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors">
@@ -57,6 +57,10 @@
                     <th class="px-6 py-4 w-12 text-center">No</th>
                     <th class="px-6 py-4">Name</th>
                     <th class="px-6 py-4">Contact</th>
+                    @if(auth()->user()->role === 'super_admin')
+                        <th class="px-6 py-4">Event</th>
+                        <th class="px-6 py-4">Admin</th>
+                    @endif
                     <th class="px-6 py-4 text-center">Category & Size</th>
                     <th class="px-6 py-4 text-center">Ticket Status</th>
                     <th class="px-6 py-4 text-center">Actions</th>
@@ -76,6 +80,22 @@
                         <div class="text-slate-800">{{ $participant->phone }}</div>
                         <div class="text-xs text-slate-500">{{ $participant->user->email ?? '-' }}</div>
                     </td>
+                    @if(auth()->user()->role === 'super_admin')
+                        <td class="px-6 py-4">
+                            <div class="font-bold text-slate-800">{{ $participant->event->title ?? '-' }}</div>
+                            <div class="text-xs text-blue-600 font-semibold">Kategori: {{ $participant->category }}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            @if($participant->event && $participant->event->admins->isNotEmpty())
+                                @foreach($participant->event->admins as $adm)
+                                    <div class="font-medium text-slate-700">{{ $adm->name }}</div>
+                                    <div class="text-xs text-slate-400 font-mono">{{ $adm->email }}</div>
+                                @endforeach
+                            @else
+                                <span class="text-xs text-slate-400 italic">No Admin</span>
+                            @endif
+                        </td>
+                    @endif
                     <td class="px-6 py-4 text-center">
                         <div class="font-bold text-blue-600">{{ $participant->category }}</div>
                         <div class="text-xs text-slate-500">Jersey: {{ $participant->jersey_size }}</div>
@@ -113,7 +133,7 @@
                 
                 @if($participants->isEmpty())
                 <tr>
-                    <td colspan="7" class="px-6 py-12 text-center text-slate-500">No participants found.</td>
+                    <td colspan="{{ auth()->user()->role === 'super_admin' ? 9 : 7 }}" class="px-6 py-12 text-center text-slate-500">No participants found.</td>
                 </tr>
                 @endif
             </tbody>

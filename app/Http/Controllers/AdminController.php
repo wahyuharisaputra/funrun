@@ -66,7 +66,8 @@ class AdminController extends Controller
                     'title' => $ev['nama'] ?? 'SeTiket',
                     'date' => self::parseDateString($ev['tanggal']),
                     'location' => $ev['lokasi'] ?? 'City Square',
-                    'quota' => 5000
+                    'quota' => 5000,
+                    'payment_methods' => $ev['payment_methods'] ?? null
                 ]
             );
         }
@@ -99,18 +100,29 @@ class AdminController extends Controller
 
     public function participants(Request $request)
     {
-        $query = \App\Models\Participant::with(['ticket.payments', 'user'])->latest();
+        $query = \App\Models\Participant::with(['ticket.payments', 'user', 'event.admins'])->latest();
         $user = auth()->user();
-
+ 
         if ($user->role === 'admin') {
             $query->where('event_id', $user->event_id);
+            $categories = \App\Models\EventCategory::where('event_id', $user->event_id)->get();
+        } else {
+            $categories = \App\Models\EventCategory::select('code', 'name')->groupBy('code', 'name')->get();
         }
 
+        if ($categories->isEmpty()) {
+            $categories = collect([
+                (object) ['code' => '3K', 'name' => '3K Run'],
+                (object) ['code' => '5K', 'name' => '5K Run'],
+                (object) ['code' => '10K', 'name' => '10K Run']
+            ]);
+        }
+ 
         $currentCategory = $request->category ?? 'all';
         if ($currentCategory !== 'all') {
             $query->where('category', $currentCategory);
         }
-
+ 
         if ($request->has('search') && !empty($request->search)) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
@@ -124,12 +136,12 @@ class AdminController extends Controller
                   });
             });
         }
-
+ 
         $participants = $query->paginate(10)->withQueryString();
-
-        return view('admin.participants', compact('participants', 'currentCategory'));
+ 
+        return view('admin.participants', compact('participants', 'currentCategory', 'categories'));
     }
-
+ 
     public function editParticipant($id)
     {
         $participant = \App\Models\Participant::findOrFail($id);
@@ -137,9 +149,17 @@ class AdminController extends Controller
         if ($user->role === 'admin' && $participant->event_id !== $user->event_id) {
             abort(403, 'Unauthorized action.');
         }
-        return view('admin.participant-edit', compact('participant'));
+        $categories = \App\Models\EventCategory::where('event_id', $participant->event_id)->get();
+        if ($categories->isEmpty()) {
+            $categories = collect([
+                (object) ['code' => '3K', 'name' => '3K Run'],
+                (object) ['code' => '5K', 'name' => '5K Run'],
+                (object) ['code' => '10K', 'name' => '10K Run']
+            ]);
+        }
+        return view('admin.participant-edit', compact('participant', 'categories'));
     }
-
+ 
     public function updateParticipant(Request $request, $id)
     {
         $participant = \App\Models\Participant::findOrFail($id);
@@ -147,16 +167,21 @@ class AdminController extends Controller
         if ($user->role === 'admin' && $participant->event_id !== $user->event_id) {
             abort(403, 'Unauthorized action.');
         }
+ 
+        $validCategories = \App\Models\EventCategory::where('event_id', $participant->event_id)->pluck('code')->toArray();
+        if (empty($validCategories)) {
+            $validCategories = ['3K', '5K', '10K'];
+        }
 
         $request->validate([
             'fullname' => 'required|string|max:255',
             'phone' => 'required|string|max:20',
-            'category' => 'required|in:3K,5K,10K',
+            'category' => 'required|in:' . implode(',', $validCategories),
             'jersey_size' => 'required|in:S,M,L,XL,XXL',
         ]);
-
+ 
         $participant->update($request->only('fullname', 'phone', 'category', 'jersey_size'));
-
+ 
         return redirect()->route('admin.participants')->with('success', 'Participant data updated successfully!');
     }
 
@@ -396,12 +421,10 @@ class AdminController extends Controller
             $participant = $payment->ticket->participant;
             $pdfUrl = route('ticket.pdf', $payment->ticket->ticket_code);
             
-            $categoryTitles = [
-                '3K' => '3K Fun Walk',
-                '5K' => '5K Night Run',
-                '10K' => '10K Challenger'
-            ];
-            $ticketTitle = $categoryTitles[$participant->category] ?? $participant->category;
+            $categoryModel = \App\Models\EventCategory::where('event_id', $participant->event_id)
+                ->where('code', $participant->category)
+                ->first();
+            $ticketTitle = $categoryModel ? $categoryModel->name : $participant->category;
 
             $waMessage = "*PEMBAYARAN BERHASIL*\n" .
                          "*SeTiket*\n\n" .
@@ -503,10 +526,37 @@ class AdminController extends Controller
 
     // ===== EVENT MANAGEMENT =====
 
-    public function events()
+    public function events(Request $request)
     {
         $this->checkSuperAdmin();
         $events = \App\Http\Controllers\HomeController::loadEvents();
+
+        // 1. Search
+        $search = $request->input('search');
+        if (!empty($search)) {
+            $events = array_filter($events, function($ev) use ($search) {
+                return (isset($ev['nama']) && stripos($ev['nama'], $search) !== false) ||
+                       (isset($ev['lokasi']) && stripos($ev['lokasi'], $search) !== false) ||
+                       (isset($ev['tanggal']) && stripos($ev['tanggal'], $search) !== false);
+            });
+            // Re-index array keys
+            $events = array_values($events);
+        }
+
+        // 2. Pagination
+        $perPage = 10;
+        $page = $request->query('page', 1);
+        $offset = ($page - 1) * $perPage;
+        
+        $paginatedItems = array_slice($events, $offset, $perPage);
+        $events = new \Illuminate\Pagination\LengthAwarePaginator(
+            $paginatedItems,
+            count($events),
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
         return view('admin.events', compact('events'));
     }
 
@@ -524,6 +574,10 @@ class AdminController extends Controller
             'waktu'            => 'nullable|string|max:100',
             'deskripsi'        => 'nullable|string|max:5000',
             'syarat_ketentuan' => 'nullable|string|max:5000',
+            'payment_name'     => 'required|array|min:1',
+            'payment_name.*'   => 'required|string|max:255',
+            'payment_number.*' => 'required|string|max:255',
+            'payment_holder.*' => 'required|string|max:255',
         ]);
 
         $events = \App\Http\Controllers\HomeController::loadEvents();
@@ -533,6 +587,19 @@ class AdminController extends Controller
         if ($request->hasFile('thumbnail')) {
             $path = $request->file('thumbnail')->store('thumbnails', 'public');
             $thumbnailPath = '/storage/' . $path;
+        }
+
+        $paymentMethods = [];
+        if ($request->has('payment_name')) {
+            foreach ($request->payment_name as $index => $name) {
+                if (!empty($name)) {
+                    $paymentMethods[] = [
+                        'name' => $name,
+                        'account_number' => $request->payment_number[$index] ?? '',
+                        'account_holder' => $request->payment_holder[$index] ?? '',
+                    ];
+                }
+            }
         }
 
         $newEventId = $maxId + 1;
@@ -548,6 +615,7 @@ class AdminController extends Controller
             'waktu'            => $request->waktu ?? '',
             'deskripsi'        => $request->deskripsi ?? '',
             'syarat_ketentuan' => $request->syarat_ketentuan ?? '',
+            'payment_methods'  => $paymentMethods,
         ];
 
         \App\Http\Controllers\HomeController::saveEvents($events);
@@ -559,7 +627,8 @@ class AdminController extends Controller
                 'title' => $request->nama,
                 'date' => self::parseDateString($request->tanggal),
                 'location' => $request->lokasi,
-                'quota' => 5000
+                'quota' => 5000,
+                'payment_methods' => $paymentMethods
             ]
         );
 
@@ -580,10 +649,28 @@ class AdminController extends Controller
             'waktu'            => 'nullable|string|max:100',
             'deskripsi'        => 'nullable|string|max:5000',
             'syarat_ketentuan' => 'nullable|string|max:5000',
+            'payment_name'     => 'required|array|min:1',
+            'payment_name.*'   => 'required|string|max:255',
+            'payment_number.*' => 'required|string|max:255',
+            'payment_holder.*' => 'required|string|max:255',
         ]);
 
         $events = \App\Http\Controllers\HomeController::loadEvents();
         $found = false;
+
+        $paymentMethods = [];
+        if ($request->has('payment_name')) {
+            foreach ($request->payment_name as $index => $name) {
+                if (!empty($name)) {
+                    $paymentMethods[] = [
+                        'name' => $name,
+                        'account_number' => $request->payment_number[$index] ?? '',
+                        'account_holder' => $request->payment_holder[$index] ?? '',
+                    ];
+                }
+            }
+        }
+
         foreach ($events as &$ev) {
             if ($ev['id'] == $id) {
                 $ev['nama']             = $request->nama;
@@ -595,6 +682,7 @@ class AdminController extends Controller
                 $ev['waktu']            = $request->waktu ?? '';
                 $ev['deskripsi']        = $request->deskripsi ?? '';
                 $ev['syarat_ketentuan'] = $request->syarat_ketentuan ?? '';
+                $ev['payment_methods']  = $paymentMethods;
                 
                 if ($request->hasFile('thumbnail')) {
                     $path = $request->file('thumbnail')->store('thumbnails', 'public');
@@ -616,7 +704,8 @@ class AdminController extends Controller
                     'title' => $request->nama,
                     'date' => self::parseDateString($request->tanggal),
                     'location' => $request->lokasi,
-                    'quota' => 5000
+                    'quota' => 5000,
+                    'payment_methods' => $paymentMethods
                 ]
             );
         }
@@ -660,15 +749,39 @@ class AdminController extends Controller
 
     // ===== ADMIN MANAGEMENT =====
 
-    public function admins()
+    public function admins(Request $request)
     {
         $this->checkSuperAdmin();
-        $admins = \App\Models\User::with('event')->where('role', 'admin')->latest()->get();
+        
+        $query = \App\Models\User::with('event')->where('role', 'admin')->latest();
+
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        $admins = $query->paginate(10)->withQueryString();
         
         // Load events for the selection dropdown
         $events = \App\Models\Event::all();
         
         return view('admin.admins', compact('admins', 'events'));
+    }
+
+    public function bulkDestroyAdmin(Request $request)
+    {
+        $this->checkSuperAdmin();
+        $ids = $request->input('ids', []);
+        if (!is_array($ids) || empty($ids)) {
+            return redirect()->back()->with('error', 'Pilih admin yang ingin dihapus terlebih dahulu.');
+        }
+
+        \App\Models\User::whereIn('id', $ids)->where('role', 'admin')->delete();
+
+        return redirect()->route('admin.admins')->with('success', 'Admin terpilih berhasil dihapus!');
     }
 
     public function storeAdmin(Request $request)
@@ -726,5 +839,98 @@ class AdminController extends Controller
         $admin->delete();
 
         return redirect()->route('admin.admins')->with('success', 'Admin berhasil dihapus!');
+    }
+
+    // ===== EVENT CATEGORY MANAGEMENT =====
+
+    public function eventCategories($id)
+    {
+        $this->checkSuperAdmin();
+        
+        // Ensure event exists in DB, if not firstOrCreate from JSON fallback
+        $dbEvent = \App\Models\Event::find($id);
+        if (!$dbEvent) {
+            $events = \App\Http\Controllers\HomeController::loadEvents();
+            $jsonEvent = collect($events)->firstWhere('id', (int)$id);
+            if ($jsonEvent) {
+                $dbEvent = \App\Models\Event::create([
+                    'id' => $id,
+                    'title' => $jsonEvent['nama'] ?? 'SeTiket',
+                    'date' => self::parseDateString($jsonEvent['tanggal'] ?? ''),
+                    'location' => $jsonEvent['lokasi'] ?? 'City Square',
+                    'quota' => 5000
+                ]);
+            } else {
+                abort(404, 'Event tidak ditemukan.');
+            }
+        }
+
+        // Seed default categories if none exist yet
+        if ($dbEvent->categories()->count() === 0) {
+            $dbEvent->categories()->createMany([
+                ['name' => '3K Fun Walk', 'code' => '3K', 'bib_code' => 'FW', 'price' => 100000],
+                ['name' => '5K Night Run', 'code' => '5K', 'bib_code' => 'NR', 'price' => 150000],
+                ['name' => '10K Challenger', 'code' => '10K', 'bib_code' => 'CH', 'price' => 250000],
+            ]);
+        }
+
+        $categories = $dbEvent->categories;
+        return view('admin.categories', compact('dbEvent', 'categories'));
+    }
+
+    public function storeEventCategory(Request $request, $id)
+    {
+        $this->checkSuperAdmin();
+        
+        $request->validate([
+            'name'     => 'required|string|max:255',
+            'code'     => 'required|string|max:50',
+            'bib_code' => 'required|string|max:50',
+            'price'    => 'required|integer|min:0',
+        ]);
+
+        \App\Models\EventCategory::create([
+            'event_id' => $id,
+            'name'     => $request->name,
+            'code'     => $request->code,
+            'bib_code' => $request->bib_code,
+            'price'    => $request->price,
+        ]);
+
+        return redirect()->route('admin.events.categories', $id)->with('success', 'Kategori berhasil ditambahkan!');
+    }
+
+    public function updateEventCategory(Request $request, $category_id)
+    {
+        $this->checkSuperAdmin();
+        
+        $category = \App\Models\EventCategory::findOrFail($category_id);
+
+        $request->validate([
+            'name'     => 'required|string|max:255',
+            'code'     => 'required|string|max:50',
+            'bib_code' => 'required|string|max:50',
+            'price'    => 'required|integer|min:0',
+        ]);
+
+        $category->update([
+            'name'     => $request->name,
+            'code'     => $request->code,
+            'bib_code' => $request->bib_code,
+            'price'    => $request->price,
+        ]);
+
+        return redirect()->route('admin.events.categories', $category->event_id)->with('success', 'Kategori berhasil diperbarui!');
+    }
+
+    public function destroyEventCategory($category_id)
+    {
+        $this->checkSuperAdmin();
+        
+        $category = \App\Models\EventCategory::findOrFail($category_id);
+        $eventId = $category->event_id;
+        $category->delete();
+
+        return redirect()->route('admin.events.categories', $eventId)->with('success', 'Kategori berhasil dihapus!');
     }
 }
